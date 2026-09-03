@@ -520,7 +520,7 @@ int gpio_mcp23xxx_init(const struct device *dev)
 	if (config->gpio_int.port) {
 		if (config->ngpios == 16) {
 			/* send both ports' interrupts through one IRQ pin */
-			err = write_iocon(dev, REG_IOCON_MIRROR);
+			err = write_iocon(dev, REG_IOCON_MIRROR | REG_IOCON_ODR);
 
 			if (err != 0) {
 				LOG_ERR("Failed to enable mirrored IRQ pins: %d", err);
