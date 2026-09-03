@@ -406,6 +406,7 @@ static void mcp23xxx_work_handler(struct k_work *work)
 {
 	struct mcp23xxx_drv_data *drv_data = CONTAINER_OF(work, struct mcp23xxx_drv_data, work);
 	const struct device *dev = drv_data->dev;
+	const struct mcp23xxx_config *config = dev->config;
 
 	int ret;
 
@@ -448,11 +449,13 @@ static void mcp23xxx_work_handler(struct k_work *work)
 		(~intcap & drv_data->falling_edge_ints);
 
 	k_sem_give(&drv_data->lock);
+	gpio_pin_interrupt_configure_dt(&config->gpio_int, GPIO_INT_LEVEL_ACTIVE);
 	gpio_fire_callbacks(&drv_data->callbacks, dev, intf);
 	return;
 
 fail:
 	k_sem_give(&drv_data->lock);
+	gpio_pin_interrupt_configure_dt(&config->gpio_int, GPIO_INT_LEVEL_ACTIVE);
 }
 
 static void mcp23xxx_int_gpio_handler(const struct device *port, struct gpio_callback *cb,
@@ -460,7 +463,13 @@ static void mcp23xxx_int_gpio_handler(const struct device *port, struct gpio_cal
 {
 	struct mcp23xxx_drv_data *drv_data =
 		CONTAINER_OF(cb, struct mcp23xxx_drv_data, int_gpio_cb);
+	const struct mcp23xxx_config *config = drv_data->dev->config;
 
+	/* The INT line is level-triggered so that it can wake the SoC from
+	 * System OFF. Mask it until the work item has read INTCAP and the chip
+	 * has released the line, otherwise it re-asserts immediately.
+	 */
+	gpio_pin_interrupt_configure_dt(&config->gpio_int, GPIO_INT_DISABLE);
 	k_work_submit(&drv_data->work);
 }
 
@@ -550,7 +559,7 @@ int gpio_mcp23xxx_init(const struct device *dev)
 			return -EIO;
 		}
 
-		err = gpio_pin_interrupt_configure_dt(&config->gpio_int, GPIO_INT_EDGE_TO_ACTIVE);
+		err = gpio_pin_interrupt_configure_dt(&config->gpio_int, GPIO_INT_LEVEL_ACTIVE);
 		if (err != 0) {
 			LOG_ERR("Failed to configure INT interrupt: %d", err);
 			return -EIO;
