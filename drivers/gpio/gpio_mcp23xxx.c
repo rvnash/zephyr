@@ -497,7 +497,14 @@ int gpio_mcp23xxx_init(const struct device *dev)
 		return err;
 	}
 
-	k_sem_init(&drv_data->lock, 0, 1);
+	/* Initialise the lock as available. It used to start at 0 and only be
+	 * given at the end of a successful init, which meant any error return
+	 * below left it held forever -- and since every API entry point does
+	 * k_sem_take(..., K_FOREVER), the first caller after a failed init
+	 * deadlocked. That turns a recoverable I2C problem into a silent hang
+	 * during boot, before USB or Bluetooth come up.
+	 */
+	k_sem_init(&drv_data->lock, 1, 1);
 
 	/* If the RESET line is available, pulse it. */
 	if (config->gpio_reset.port) {
