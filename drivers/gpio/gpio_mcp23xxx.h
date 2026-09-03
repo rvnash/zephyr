@@ -35,6 +35,7 @@
 #define REG_OLAT 0x0A
 
 #define REG_IOCON_MIRROR BIT(6)
+#define REG_IOCON_ODR BIT(2)
 
 #define MCP23SXX_ADDR 0x40
 #define MCP23SXX_READBIT 0x01
