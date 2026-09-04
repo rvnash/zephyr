@@ -527,7 +527,24 @@ int gpio_mcp23xxx_init(const struct device *dev)
 	if (config->gpio_int.port) {
 		if (config->ngpios == 16) {
 			/* send both ports' interrupts through one IRQ pin */
-			err = write_iocon(dev, REG_IOCON_MIRROR | REG_IOCON_ODR);
+			/* The first bus transaction after a warm reset can fail: a
+			 * device left mid-transfer by the reset keeps holding the data
+			 * line, so the controller cannot start and times out. The
+			 * controller recovers afterwards, so retry instead of failing
+			 * init -- an aborted init leaves this expander's IOCON unset and
+			 * its inputs unconfigured, which on a keyboard reads as every key
+			 * held down.
+			 */
+			for (int attempt = 0; attempt < 3; attempt++) {
+				err = write_iocon(dev, REG_IOCON_MIRROR | REG_IOCON_ODR);
+				if (err == 0) {
+					break;
+				}
+
+				LOG_WRN("IOCON write failed (%d), retrying (%d/3)", err,
+					attempt + 1);
+				k_msleep(2);
+			}
 
 			if (err != 0) {
 				LOG_ERR("Failed to enable mirrored IRQ pins: %d", err);
